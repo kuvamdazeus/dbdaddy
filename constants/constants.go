@@ -2,15 +2,22 @@ package constants
 
 const (
 	// Self
-	SelfConfigDirName  = ".dbdaddy"
-	SelfConfigFileName = "dbdaddy.config.json"
-	SelfDbName         = "__daddys_home"
+	SelfConfigDirName   = ".dbdaddy"
+	SelfConfigFileName  = "config.json"
+	SelfStateFileName   = "state.json"
+	SelfEnvVarsFileName = ".env.vars"
+	SelfDbName          = "__daddys_home"
 
 	//  Config keys
 	DbConfigOriginsKey       = "origins"
 	DbConfigConnKey          = "connection"
 	DbConfigShadowConnKey    = "tmp_db_connection"
 	DbConfigCurrentBranchKey = "status.currentBranch"
+
+	// ENV vars file keys
+	EnvVarsDatabaseUrlKey       = "DATABASE_URL"
+	EnvVarsShadowDatabaseUrlKey = "SHADOW_DATABASE_URL"
+	EnvVarsOriginKeyPrefix      = "ORIGIN_"
 
 	// Config possible driver values
 	DbDriverPostgres = "postgres"

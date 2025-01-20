@@ -2,9 +2,9 @@ package dumpMeCmd
 
 import (
 	"errors"
+	"os"
 	"path"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/errs"
 	"github.com/fossmedaddy/dbdaddy/globals"
@@ -13,7 +13,6 @@ import (
 	"github.com/fossmedaddy/dbdaddy/middlewares"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -35,30 +34,27 @@ func run(cmd *cobra.Command, args []string) {
 		configFilePath = libUtils.GetGlobalConfigPath()
 	}
 
-	v := viper.New()
-	lib.ReadConfig(v, configFilePath)
-	viperCC, err := libUtils.GetConnConfigFromViper(v)
-	if err != nil {
-		cmd.PrintErrln("unexpected error occured!")
-		cmd.PrintErrln(err)
-		return
-	}
+	connConfig := globals.CurrentConnConfig
+	connConfig.Database = globals.CliConfig.State.CurrentBranch
 
 	outputFilePath := path.Join(
-		libUtils.GetDriverDumpDir(configFilePath, viperCC.Driver),
-		libUtils.GetDumpFileName(v.GetString(constants.DbConfigCurrentBranchKey)),
+		libUtils.GetDriverDumpDir(configFilePath, connConfig.Driver),
+		libUtils.GetDumpFileName(connConfig.Database),
 	)
 
-	connConfig := globals.CurrentConnConfig
-	connConfig.Database = v.GetString(constants.DbConfigCurrentBranchKey)
-	if err := db_int.DumpDb(outputFilePath, connConfig, false); err != nil {
-		if errors.Is(err, errs.ErrPgDumpCmdNotFound) {
-			cmd.Println("Hey! we noticed you don't have 'pg_dump', then you also probably won't have 'pg_restore', we use these tools internally to perform dumps & restores... please install these tools in your OS before proceeding.")
-		} else {
-			cmd.PrintErrln("Unexpected error occured:", err)
+	if err := lib.TmpSwitchConn(connConfig, func() error {
+		dumpErr := db_int.DumpDb(outputFilePath, connConfig.Database, false)
+		if dumpErr != nil {
+			if errors.Is(dumpErr, errs.ErrPgDumpCmdNotFound) {
+				cmd.Println("Hey! we noticed you don't have 'pg_dump', then you also probably won't have 'pg_restore', we use these tools internally to perform dumps & restores... please install these tools in your OS before proceeding.")
+			}
 		}
 
-		return
+		return dumpErr
+	}); err != nil {
+		cmd.PrintErrln("unexpected error occured!")
+		cmd.PrintErrln(err)
+		os.Exit(1)
 	}
 
 	cmd.Println("\nDumped successfully! output file:", outputFilePath)

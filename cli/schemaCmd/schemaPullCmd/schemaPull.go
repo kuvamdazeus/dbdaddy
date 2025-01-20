@@ -6,10 +6,11 @@ import (
 
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/lib"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
+	"github.com/fossmedaddy/dbdaddy/types"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
@@ -41,14 +42,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	schemaDirPath := path.Join(cwd, constants.SchemaDirName)
 
-	connConfig, connConfigErr := libUtils.GetConnConfigFromViper(viper.GetViper())
-	if connConfigErr != nil {
-		cmd.PrintErrln("unexpected error occured")
-		cmd.PrintErrln(connConfigErr)
-		return
-	}
-
-	if err := lib.TmpSwitchConn(connConfig, func() error {
+	if err := cliUtils.TmpSwitchSuitableConn(cmd, func(connConfig types.ConnConfig, usingRemoteConnConfig bool) error {
 		if err := lib.LoadDbSchemaIntoSchemaDir(schemaDirPath); err != nil {
 			return err
 		}

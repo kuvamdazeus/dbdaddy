@@ -23,16 +23,14 @@ import (
 	"github.com/fossmedaddy/dbdaddy/cli/statusCmd"
 	"github.com/fossmedaddy/dbdaddy/cli/uriCmd"
 	"github.com/fossmedaddy/dbdaddy/cli/versionCmd"
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db"
+	"github.com/fossmedaddy/dbdaddy/devutils"
 	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
-	"github.com/fossmedaddy/dbdaddy/types"
 	"github.com/manifoldco/promptui"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
@@ -65,8 +63,13 @@ func rootPreRun(cmd *cobra.Command, args []string) {
 	if strings.HasPrefix(cmdPath, "version") {
 		return
 	}
+	if strings.HasPrefix(cmdPath, "uri") {
+		return
+	}
 
 	if lib.IsFirstTimeUser() {
+		cliConfig := lib.InitCliConfig()
+
 		cmd.Println(fmt.Sprintf("Daddy's home baby. (version: %s)", globals.Version))
 		cmd.Println("I'll create a global config for ya, let me know your database uri here...")
 
@@ -81,20 +84,19 @@ func rootPreRun(cmd *cobra.Command, args []string) {
 		}
 		promptConnUri = strings.Trim(promptConnUri, " ")
 
-		connConfig := types.NewDefaultPgConnConfig()
 		if len(promptConnUri) > 0 {
 			if cc, err := libUtils.GetConnConfigFromUri(promptConnUri); err != nil {
 				cmd.PrintErrln("error occured while parsing connection uri")
 				cmd.PrintErrln(err)
 				os.Exit(1)
 			} else {
-				connConfig = cc
-
 				if _, err := db.ConnectDb(cc); err != nil {
 					cmd.PrintErrln("can't connect to your database, please check uri...")
 					cmd.PrintErrln(err)
 					os.Exit(1)
 				}
+
+				cliConfig.MainConnConfig = cc
 			}
 
 		}
@@ -103,29 +105,36 @@ func rootPreRun(cmd *cobra.Command, args []string) {
 		configDirPath := path.Dir(configFilePath)
 		libUtils.EnsureDirExists(configDirPath)
 
-		v := viper.New()
-		lib.InitConfigFile(v, configDirPath, false)
-		v.Set(constants.DbConfigConnKey, connConfig)
-		v.Set(constants.DbConfigCurrentBranchKey, connConfig.Database)
-
-		if err := v.WriteConfigAs(configFilePath); err != nil {
-			cmd.PrintErrln("error occured while writing to config file")
+		globals.CliConfig = cliConfig
+		if err := lib.WriteConfig(cliConfig, configDirPath, false); err != nil {
+			cmd.PrintErrln("error occured while initializing config file!")
 			cmd.PrintErrln(err)
 			os.Exit(1)
 		}
 
-		lib.ReadConfig(viper.GetViper(), configFilePath)
-
-		cmd.Println(fmt.Sprintf("Opening config file at: '%s'", configFilePath))
-		libUtils.OpenFileInEditor(configFilePath)
-
+		if err := libUtils.OpenFileInEditor(configFilePath); err != nil {
+			cmd.Println(
+				fmt.Sprintf(
+					"WARNING: error occured while opening config file in a system editor. %s",
+					err.Error(),
+				),
+			)
+		}
+		cmd.Println(fmt.Sprintf("config file saved at '%s'", configFilePath))
 		cmd.Println(fmt.Sprintln())
 	}
 
 	if err := lib.EnsureSupportedDbDriver(); err != nil {
-		cmd.PrintErrln(fmt.Sprintf("unsupported driver found, currently supported driver are: %v", constants.SupportedDrivers))
+		cmd.PrintErrln(err)
 		os.Exit(1)
 	}
+
+	if _, err := db.ConnectDb(globals.CliConfig.MainConnConfig); err != nil {
+		cmd.PrintErrln("can't connect to your database, please check uri...")
+		cmd.PrintErrln(err)
+		os.Exit(1)
+	}
+
 }
 
 func rootCmdRun(cmd *cobra.Command, args []string) {
@@ -134,8 +143,20 @@ func rootCmdRun(cmd *cobra.Command, args []string) {
 
 func main() {
 	if !lib.IsFirstTimeUser() {
-		configFilePath, _ := libUtils.FindConfigFilePath()
-		lib.ReadConfig(viper.GetViper(), configFilePath)
+		configDirPath, configErr := libUtils.FindConfigDirPath()
+		if configErr != nil {
+			rootCmd.PrintErrln("unexpected error occured!", configErr)
+			os.Exit(1)
+		}
+
+		if _, err := lib.ReadConfig(configDirPath, true); err != nil {
+			rootCmd.PrintErrln("error occured while reading config!", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("read from configDirPath", configDirPath)
+		devutils.PrettyPrint(globals.CliConfig)
+		fmt.Println()
 	}
 
 	rootCmd.AddCommand(versionCmd.Init())

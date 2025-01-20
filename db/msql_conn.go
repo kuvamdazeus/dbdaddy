@@ -1,10 +1,8 @@
 package db
 
-import (
-	"github.com/spf13/viper"
-)
+import "github.com/fossmedaddy/dbdaddy/types"
 
-func GetMysqlConnUriFromViper(v *viper.Viper, dbname string) string {
+func GetMysqlConnUriFromViper(cliConfig *types.CliConfig, dbname string) string {
 	// return fmt.Sprintf(
 	// 	`%s:%s@tcp(%s:%s)/%s?multiStatements=true`,
 	// 	v.GetString(constants.DbConfigUserKey),

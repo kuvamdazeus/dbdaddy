@@ -23,7 +23,11 @@ func CreateShadowDB() (string, error) {
 		if strings.HasPrefix(shadowDbPrefix, db) {
 			dbSeq, err := strconv.Atoi(strings.ReplaceAll(db, shadowDbPrefix, ""))
 			if err != nil {
-				return "", fmt.Errorf("database name '%s' has invalid non-parsable sequence, please delete this db to resolve the error (author skill issues detected).")
+				return "",
+					fmt.Errorf(
+						"database name '%s' has invalid non-parsable sequence, please delete this db to resolve the error.",
+						db,
+					)
 			}
 
 			seq = max(dbSeq, seq)

@@ -2,14 +2,16 @@ package cloneCmd
 
 import (
 	"fmt"
+	"os"
 	"path"
 
+	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/globals"
+	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -34,8 +36,19 @@ func argFn(cmd *cobra.Command, args []string) error {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	remoteUri := args[0]
+	configDirPath, configErr := libUtils.FindConfigDirPath()
+	if configErr != nil {
+		cmd.PrintErrln("please setup a project or configure a global config! no local instance specified to connect to!")
+		os.Exit(1)
+	}
+	configFilePath := path.Join(configDirPath, constants.SelfConfigFileName)
 
+	if _, err := lib.ReadConfig(configDirPath, true); err != nil {
+		cmd.PrintErrln("unexpected error occured!", err)
+		os.Exit(1)
+	}
+
+	remoteUri := args[0]
 	remoteConnConfig, err := libUtils.GetConnConfigFromUri(remoteUri)
 	if err != nil {
 		cmd.PrintErrln(err)
@@ -51,40 +64,54 @@ func run(cmd *cobra.Command, args []string) {
 
 	cmd.Println("started dump process...")
 
-	configFilePath, _ := libUtils.FindConfigFilePath()
 	dumpOutFile := path.Join(
 		libUtils.GetDriverDumpDir(configFilePath, remoteConnConfig.Driver),
 		libUtils.GetDumpFileName(dbname),
 	)
-	if err := db_int.DumpDb(dumpOutFile, remoteConnConfig, onlySchemaFlag); err != nil {
-		cmd.PrintErrln("error occured while taking a dump of the remote database!")
+
+	if err := lib.TmpSwitchConn(remoteConnConfig, func() error {
+		dumpErr := db_int.DumpDb(dumpOutFile, remoteConnConfig.Database, onlySchemaFlag)
+		if dumpErr != nil {
+			cmd.PrintErrln("error occured while taking a dump of the remote database!")
+			cmd.PrintErrln(dumpErr)
+		}
+
+		return dumpErr
+	}); err != nil {
+		cmd.PrintErrln("unexpected error occured!")
 		cmd.PrintErrln(err)
-		return
+		os.Exit(1)
 	}
 
 	cmd.Println(fmt.Sprintf("remote database dump complete, saved at: %s", dumpOutFile))
 
-	if _, err := db.ConnectSelfDb(viper.GetViper()); err != nil {
+	if err := lib.TmpSwitchConn(globals.CliConfig.MainConnConfig, func() error {
+		_, connectErr := db.ConnectSelfDb(globals.CliConfig.MainConnConfig)
+		if connectErr != nil {
+			return connectErr
+		}
+
+		return nil
+	}); err != nil {
+		cmd.PrintErrln("unexpected error occured while connecting to the database!")
 		cmd.PrintErrln(err)
-		cmd.PrintErrln("could not connect to a database to restore remote database into...")
-		return
+		os.Exit(1)
 	}
 
-	if db_int.DbExists(dbname) && !forceFlag {
-		cmd.PrintErrln(fmt.Printf("database with name %s already exists, choose a different db name or use --force flag.", dbname))
-		return
+	if err := lib.TmpSwitchConn(globals.CliConfig.MainConnConfig, func() error {
+		if db_int.DbExists(dbname) && !forceFlag {
+			cmd.PrintErrln(fmt.Printf("database with name %s already exists, choose a different db name or use --force flag.", dbname))
+			os.Exit(1)
+		}
+
+		return db_int.RestoreDb(dbname, dumpOutFile, true)
+	}); err != nil {
+		cmd.PrintErrln("unexpected error occured while restoring database!", err)
+		os.Exit(1)
 	}
 
-	connConfig := globals.CurrentConnConfig
-	connConfig.Database = dbname
-	if err := db_int.RestoreDb(connConfig, dumpOutFile, true); err != nil {
-		cmd.PrintErrln(err)
-		return
-	}
-
-	originConfigKey := libUtils.GetDbConfigOriginKey(dbname)
-	viper.Set(originConfigKey, remoteConnConfig)
-	if err := viper.WriteConfig(); err != nil {
+	globals.CliConfig.Origins[remoteConnConfig.Database] = remoteConnConfig
+	if err := lib.WriteConfig(globals.CliConfig, configDirPath, true); err != nil {
 		cmd.PrintErrln("error occured while writing to config file")
 		cmd.PrintErrln(err)
 		return

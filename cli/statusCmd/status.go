@@ -1,11 +1,10 @@
 package statusCmd
 
 import (
-	"github.com/fossmedaddy/dbdaddy/constants"
+	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
@@ -17,7 +16,7 @@ var cmd = &cobra.Command{
 }
 
 func run(cmd *cobra.Command, args []string) {
-	cmd.Println("On branch:", viper.GetString(constants.DbConfigCurrentBranchKey))
+	cmd.Println("On branch:", globals.CliConfig.State.CurrentBranch)
 }
 
 func Init() *cobra.Command {

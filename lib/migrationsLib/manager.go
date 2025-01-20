@@ -15,12 +15,18 @@ import (
 
 // returns: list of migrations, the active migration index (-1 if no active migration found) and "isInit"
 // to check if the migrations directory was initialized
-func Status(currentState *types.DbSchema) (MigrationStatus, error) {
+func Status(currentState *types.DbSchema, usingRemoteMigDir bool) (MigrationStatus, error) {
 	migStat := MigrationStatus{}
 
 	configFilePath, _ := libUtils.FindConfigFilePath()
 
-	migrationsDirPath := libUtils.GetMigrationsDir(path.Dir(configFilePath), currentState.DbName)
+	var migrationsDirPath string
+	if usingRemoteMigDir {
+		migrationsDirPath = libUtils.GetRemoteMigrationsDir(path.Dir(configFilePath), currentState.DbName)
+	} else {
+		migrationsDirPath = libUtils.GetLocalMigrationsDir(path.Dir(configFilePath), currentState.DbName)
+	}
+
 	_, migDirErr := libUtils.EnsureDirExists(migrationsDirPath)
 	if migDirErr != nil {
 		return migStat, migDirErr
@@ -114,18 +120,24 @@ func ApplyMigrationSQL(migStat MigrationStatus, isUpMigration bool) error {
 	return nil
 }
 
-func GetLatestMigrationOrInit(currentState *types.DbSchema, titleIfInit string) (*DbMigration, bool, error) {
+func GetLatestMigrationOrInit(currentState *types.DbSchema, titleIfInit string, usingRemoteDir bool) (*DbMigration, bool, error) {
 	latestMig := &DbMigration{}
 	isInit := false
 	configFilePath, _ := libUtils.FindConfigFilePath()
 
-	migrationsDirPath := libUtils.GetMigrationsDir(path.Dir(configFilePath), currentState.DbName)
+	var migrationsDirPath string
+	if usingRemoteDir {
+		migrationsDirPath = libUtils.GetRemoteMigrationsDir(path.Dir(configFilePath), currentState.DbName)
+	} else {
+		migrationsDirPath = libUtils.GetLocalMigrationsDir(path.Dir(configFilePath), currentState.DbName)
+	}
+
 	_, err := libUtils.EnsureDirExists(migrationsDirPath)
 	if err != nil {
 		return latestMig, isInit, err
 	}
 
-	migStat, err := Status(currentState)
+	migStat, err := Status(currentState, usingRemoteDir)
 	if err != nil {
 		return latestMig, isInit, err
 	}
@@ -157,16 +169,29 @@ func GetLatestMigrationOrInit(currentState *types.DbSchema, titleIfInit string) 
 	return latestMig, isInit, nil
 }
 
-func GenerateMigration(currentState *types.DbSchema, latestMig *DbMigration, title string, upSql, downSql, infoStr string) (*DbMigration, error) {
-	var mig *DbMigration
-	configFilePath, _ := libUtils.FindConfigFilePath()
+type GenMigOpts struct {
+	Title, UpSql, DownSql, InfoStr string
+	CurrentState                   *types.DbSchema
+	LatestMigration                *DbMigration
+	UseRemoteDir                   bool
+}
 
-	migrationsDirPath := libUtils.GetMigrationsDir(path.Dir(configFilePath), currentState.DbName)
+func GenerateMigration(opts GenMigOpts) (*DbMigration, error) {
+	var mig *DbMigration
+	configDirPath, _ := libUtils.FindConfigDirPath()
+
+	var migrationsDirPath string
+	if opts.UseRemoteDir {
+		migrationsDirPath = libUtils.GetRemoteMigrationsDir(configDirPath, opts.CurrentState.DbName)
+	} else {
+		migrationsDirPath = libUtils.GetLocalMigrationsDir(configDirPath, opts.CurrentState.DbName)
+	}
+
 	if _, err := libUtils.EnsureDirExists(migrationsDirPath); err != nil {
 		return mig, err
 	}
 
-	migDirId, err := libUtils.GenerateMigrationId(migrationsDirPath, title)
+	migDirId, err := libUtils.GenerateMigrationId(migrationsDirPath, opts.Title)
 	if err != nil {
 		return mig, err
 	}
@@ -174,18 +199,18 @@ func GenerateMigration(currentState *types.DbSchema, latestMig *DbMigration, tit
 	migDirPath := path.Join(migrationsDirPath, migDirId)
 	if m, err := NewDbMigration(
 		migDirPath,
-		currentState,
+		opts.CurrentState,
 		"",
-		downSql,
-		infoStr,
+		opts.DownSql,
+		opts.InfoStr,
 	); err != nil {
 		return m, err
 	} else {
 		mig = m
 	}
 
-	if latestMig != nil {
-		if err := latestMig.WriteUpQuery(upSql); err != nil {
+	if opts.LatestMigration != nil {
+		if err := opts.LatestMigration.WriteUpQuery(opts.UpSql); err != nil {
 			return mig, err
 		}
 	}

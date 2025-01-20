@@ -10,7 +10,11 @@ import (
 	"github.com/fossmedaddy/dbdaddy/constants"
 )
 
-func GetMigrationsDir(configDirPath, dbname string) string {
+func GetLocalMigrationsDir(configDirPath, dbname string) string {
+	return path.Join(configDirPath, constants.MigDirName, constants.MigLocalDirName, dbname)
+}
+
+func GetRemoteMigrationsDir(configDirPath, dbname string) string {
 	return path.Join(configDirPath, constants.MigDirName, dbname)
 }
 

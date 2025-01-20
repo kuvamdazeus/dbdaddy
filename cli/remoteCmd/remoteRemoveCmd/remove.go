@@ -2,11 +2,12 @@ package remoteRemoveCmd
 
 import (
 	"fmt"
+	"os"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
-	"github.com/fossmedaddy/dbdaddy/types"
+	"github.com/fossmedaddy/dbdaddy/globals"
+	"github.com/fossmedaddy/dbdaddy/lib"
+	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cmd = &cobra.Command{
@@ -18,21 +19,25 @@ var cmd = &cobra.Command{
 }
 
 func run(cmd *cobra.Command, args []string) {
-	origins := types.DbConfigOrigins{}
-	parseErr := viper.UnmarshalKey(constants.DbConfigOriginsKey, &origins)
-
-	if parseErr != nil {
-		cmd.PrintErrln(parseErr)
-		return
+	configDirPath, configErr := libUtils.FindConfigDirPath()
+	if configErr != nil {
+		cmd.PrintErrln("unexpected error occured!", configErr)
+		os.Exit(1)
 	}
 
+	_, cwdIsProject, cwdErr := libUtils.CwdIsProject()
+	if cwdErr != nil {
+		cmd.PrintErrln("unexpected error occured!", cwdErr)
+		os.Exit(1)
+	}
+
+	origins := globals.CliConfig.Origins
 	for _, argOrigin := range args {
 		delete(origins, argOrigin)
 	}
 
-	viper.Set(constants.DbConfigOriginsKey, origins)
-	err := viper.WriteConfig()
-	if err != nil {
+	globals.CliConfig.Origins = origins
+	if err := lib.WriteConfig(globals.CliConfig, configDirPath, cwdIsProject); err != nil {
 		cmd.PrintErrln(err)
 		return
 	}

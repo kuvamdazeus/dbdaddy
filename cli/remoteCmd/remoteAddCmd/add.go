@@ -2,13 +2,13 @@ package remoteAddCmd
 
 import (
 	"fmt"
+	"slices"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
+	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 )
 
@@ -31,21 +31,23 @@ var cmd = &cobra.Command{
 }
 
 func run(cmd *cobra.Command, args []string) {
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
+	configDirPath, _ := libUtils.FindConfigDirPath()
 
 	connUri := args[0]
-
-	originConfigKey := libUtils.GetDbConfigOriginKey(currBranch)
-
-	origin := viper.GetStringMap(originConfigKey)
-	if len(maps.Keys(origin)) > 0 && !forceFlag {
-		cmd.Println(fmt.Sprintf("remote origin for '%s' already exists in the config, use force flag to override", currBranch))
-		return
-	}
-
 	connConfig, uriErr := libUtils.GetConnConfigFromUri(connUri)
 	if uriErr != nil {
-		cmd.PrintErrln(uriErr)
+		cmd.Println(fmt.Sprintf("error occured while parsing database url: %s", uriErr.Error()))
+		return
+	}
+	originName := connConfig.Database
+
+	if slices.Contains(maps.Keys(globals.CliConfig.Origins), originName) && !forceFlag {
+		cmd.Println(
+			fmt.Sprintf(
+				"remote origin for '%s' already exists in the config, use force flag to override",
+				globals.CliConfig.State.CurrentBranch,
+			),
+		)
 		return
 	}
 
@@ -56,14 +58,13 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	viper.Set(originConfigKey, connConfig)
-	err := viper.WriteConfig()
-	if err != nil {
-		cmd.PrintErrln(err)
+	globals.CliConfig.Origins[originName] = connConfig
+	if err := lib.WriteConfig(globals.CliConfig, configDirPath, true); err != nil {
+		cmd.PrintErrln("error occured while saving config:", err)
 		return
 	}
 
-	cmd.Println(fmt.Sprintf("remote origin for '%s' successfully set.", currBranch))
+	cmd.Println(fmt.Sprintf("remote origin for '%s' successfully set.", globals.CliConfig.State.CurrentBranch))
 }
 
 func Init() *cobra.Command {

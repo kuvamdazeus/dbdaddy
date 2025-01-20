@@ -9,8 +9,6 @@ import (
 	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/types"
-
-	"github.com/spf13/viper"
 )
 
 func ListTablesInDb() ([]types.Table, error) {
@@ -66,7 +64,7 @@ func GetTableSchema(schema string, tablename string) (*types.TableSchema, error)
 func GetDbSchema(schema, tablename string) (*types.DbSchema, error) {
 	var wg sync.WaitGroup
 
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
+	currBranch := globals.CliConfig.State.CurrentBranch
 	tableid := libUtils.GetTableId(schema, tablename)
 
 	dbSchema := &types.DbSchema{

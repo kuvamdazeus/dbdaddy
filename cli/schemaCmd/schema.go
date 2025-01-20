@@ -3,9 +3,15 @@ package schemaCmd
 import (
 	"github.com/fossmedaddy/dbdaddy/cli/schemaCmd/schemaPullCmd"
 	"github.com/fossmedaddy/dbdaddy/cli/schemaCmd/schemaPushCmd"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
 	"github.com/spf13/cobra"
+)
+
+var (
+	remoteFlag     bool
+	remoteNameFlag string
 )
 
 var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
@@ -31,6 +37,8 @@ func run(cmd *cobra.Command, args []string) {
 }
 
 func Init() *cobra.Command {
+	cliUtils.AddRemoteFlags(cmd, &remoteFlag, &remoteNameFlag)
+
 	cmd.AddCommand(schemaPushCmd.Init())
 	cmd.AddCommand(schemaPullCmd.Init())
 

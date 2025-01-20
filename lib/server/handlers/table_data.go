@@ -3,12 +3,11 @@ package serverHandlers
 import (
 	"fmt"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
+	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/types"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/spf13/viper"
 )
 
 func HandleGetTableRows(c *fiber.Ctx) error {
@@ -45,12 +44,10 @@ func HandleGetTableRows(c *fiber.Ctx) error {
 }
 
 func HandleGetTableSchema(c *fiber.Ctx) error {
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
-
 	tableName := c.Params("name")
 	schemaName := c.Params("schema")
 
-	schema, err := db_int.GetTableSchema(currBranch, schemaName, tableName)
+	schema, err := db_int.GetTableSchema(globals.CliState.CurrentBranch, schemaName, tableName)
 	if err != nil {
 		return err
 	}

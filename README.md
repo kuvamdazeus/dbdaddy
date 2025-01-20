@@ -104,7 +104,7 @@ from your database & then re-create it with SQL column definition such that the 
 
 ## Quickstart Guide
 
-the CLI requires a config file: `dbdaddy.config.json` to connect with your database. It has connection credentials like host, port, params, user, password, etc.
+the CLI requires a config file: `config.json` to connect with your database. It has connection credentials like host, port, params, user, password, etc.
 
 when you first install & run `dbdaddy` it asks you for a connection uri, if not provided, default PostgreSQL credentials are used that can be changed later at any point in time.
 

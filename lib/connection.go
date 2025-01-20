@@ -3,14 +3,11 @@ package lib
 import (
 	"fmt"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
-	"github.com/fossmedaddy/dbdaddy/errs"
 	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/types"
-	"github.com/spf13/viper"
 )
 
 func PingDB() error {
@@ -27,11 +24,11 @@ func PingDB() error {
 }
 
 func TmpSwitchConn(connConfig types.ConnConfig, fn func() error) error {
-	if globals.DB == nil {
-		return errs.ErrDbSwitchError
-	}
-
-	defer db.ConnectDb(globals.CurrentConnConfig)
+	defer (func() {
+		if globals.DB != nil {
+			db.ConnectDb(globals.CurrentConnConfig)
+		}
+	})()
 
 	_, err := db.ConnectDb(connConfig)
 	if err != nil {
@@ -52,24 +49,18 @@ func TmpSwitchDB(dbname string, fn func() error) error {
 }
 
 func TmpSwitchToShadowDB(fn func() error) error {
-	connConfig, err := libUtils.GetShadowConnConfig(viper.GetViper())
+	shadowConnConfig := libUtils.GetShadowConnConfig()
+
+	if globals.CliConfig.ShadowConnConfig != nil {
+		return TmpSwitchConn(shadowConnConfig, fn)
+	}
+
+	shadowDbName, err := CreateShadowDB()
 	if err != nil {
 		return err
 	}
 
-	var runFn = func() error {
-		shadowDbName, err := CreateShadowDB()
-		if err != nil {
-			return err
-		}
-		defer db_int.DeleteDb(shadowDbName)
+	defer db_int.DeleteDb(shadowDbName)
+	return TmpSwitchDB(shadowDbName, fn)
 
-		return TmpSwitchDB(shadowDbName, fn)
-	}
-
-	if viper.IsSet(constants.DbConfigShadowConnKey) {
-		return TmpSwitchConn(connConfig, runFn)
-	}
-
-	return runFn()
 }

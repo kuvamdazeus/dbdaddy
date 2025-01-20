@@ -7,7 +7,7 @@ import (
 
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
-	"github.com/fossmedaddy/dbdaddy/lib"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	migrationsLib "github.com/fossmedaddy/dbdaddy/lib/migrationsLib"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
@@ -15,7 +15,6 @@ import (
 	"github.com/fossmedaddy/dbdaddy/types"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -36,12 +35,16 @@ var cmd = &cobra.Command{
 }
 
 func run(cmd *cobra.Command, args []string) {
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
-
-	err := lib.TmpSwitchDB(currBranch, func() error {
+	err := cliUtils.TmpSwitchSuitableConn(cmd, func(connConfig types.ConnConfig, usingRemoteConnConfig bool) error {
 		configFilePath, _ := libUtils.FindConfigFilePath()
 
-		migrationsDirPath := libUtils.GetMigrationsDir(path.Dir(configFilePath), currBranch)
+		var migrationsDirPath string
+		if usingRemoteConnConfig {
+			migrationsDirPath = libUtils.GetRemoteMigrationsDir(path.Dir(configFilePath), connConfig.Database)
+		} else {
+			migrationsDirPath = libUtils.GetLocalMigrationsDir(path.Dir(configFilePath), connConfig.Database)
+		}
+
 		if _, err := libUtils.EnsureDirExists(migrationsDirPath); err != nil {
 			return err
 		}
@@ -51,7 +54,7 @@ func run(cmd *cobra.Command, args []string) {
 			return schemaErr
 		}
 
-		latestMig, _, latestMigErr := migrationsLib.GetLatestMigrationOrInit(currentState, titleFlag)
+		latestMig, _, latestMigErr := migrationsLib.GetLatestMigrationOrInit(currentState, titleFlag, usingRemoteConnConfig)
 		if latestMigErr != nil {
 			return latestMigErr
 		}
@@ -124,14 +127,16 @@ func run(cmd *cobra.Command, args []string) {
 			return nil
 		}
 
-		mig, migErr := migrationsLib.GenerateMigration(
-			currentState,
-			latestMig,
-			titleFlag,
-			upSqlScript,
-			downSqlScript,
-			migrationsLib.GetInfoTextFromDiff(upChanges),
-		)
+		opts := migrationsLib.GenMigOpts{
+			CurrentState:    currentState,
+			LatestMigration: latestMig,
+			Title:           titleFlag,
+			UpSql:           upSqlScript,
+			DownSql:         downSqlScript,
+			InfoStr:         migrationsLib.GetInfoTextFromDiff(upChanges),
+			UseRemoteDir:    usingRemoteConnConfig,
+		}
+		mig, migErr := migrationsLib.GenerateMigration(opts)
 		if migErr != nil {
 			return migErr
 		}

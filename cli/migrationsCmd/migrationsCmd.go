@@ -6,8 +6,14 @@ import (
 	"github.com/fossmedaddy/dbdaddy/cli/migrationsCmd/migrationsResetCmd"
 	"github.com/fossmedaddy/dbdaddy/cli/migrationsCmd/migrationsStatusCmd"
 	"github.com/fossmedaddy/dbdaddy/cli/migrationsCmd/migrationsUpCmd"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 
 	"github.com/spf13/cobra"
+)
+
+var (
+	remoteFlag     bool
+	remoteNameFlag string
 )
 
 var cmd = &cobra.Command{
@@ -22,6 +28,7 @@ func run(cmd *cobra.Command, args []string) {
 
 func Init() *cobra.Command {
 	// flags
+	cliUtils.AddRemoteFlags(cmd, &remoteFlag, &remoteNameFlag)
 
 	// commands
 	cmd.AddCommand(migrationsGenCmd.Init())

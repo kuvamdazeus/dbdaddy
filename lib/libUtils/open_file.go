@@ -14,8 +14,6 @@ func OpenFileInEditor(filePath string) error {
 
 	vimErr := vimOsCmd.Run()
 	if vimErr != nil {
-		fmt.Println("Failed to open vim, trying nano...")
-
 		nanoOsCmd := exec.Command("nano", filePath)
 		nanoOsCmd.Stdin = os.Stdin
 		nanoOsCmd.Stdout = os.Stdout
@@ -23,10 +21,12 @@ func OpenFileInEditor(filePath string) error {
 
 		nanoErr := nanoOsCmd.Run()
 		if nanoErr != nil {
-			fmt.Println("Holy shit bro?! wtf are you using for an OS? no vim, no nano, where tf am i?!")
-			fmt.Println("nano command gave the error:\n" + nanoErr.Error())
-			fmt.Println("vim command gave the error:\n" + vimErr.Error())
-			return fmt.Errorf("vim error: %s%snano error: %s", vimErr.Error(), fmt.Sprintln(), nanoErr.Error())
+			return fmt.Errorf(
+				"Tried opening file '%s' in nano & vim, both failed!\n%s\n%s",
+				filePath,
+				vimErr.Error(),
+				nanoErr.Error(),
+			)
 		}
 	}
 

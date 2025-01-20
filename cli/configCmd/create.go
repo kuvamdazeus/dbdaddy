@@ -2,13 +2,13 @@ package configCmd
 
 import (
 	"fmt"
+	"os"
 	"path"
 
 	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var createInGlobalNamespace = false
@@ -26,26 +26,22 @@ func createCmdRun(cmd *cobra.Command, args []string) {
 		configWritePath = libUtils.GetGlobalConfigPath()
 	}
 
+	if !overrideExisting {
+		if _, err := os.Stat(configWritePath); err == nil {
+			cmd.PrintErrln(fmt.Sprintf("config file at '%s' already exists!", configWritePath))
+			return
+		}
+	}
+
 	configWriteDirPath, _ := path.Split(configWritePath)
 	if _, err := libUtils.EnsureDirExists(configWriteDirPath); err != nil {
 		panic("Unexpected error occured!\n" + err.Error())
 	}
 
-	if overrideExisting {
-		v := viper.New()
-		lib.InitConfigFile(v, configWriteDirPath, false)
-
-		if err := v.WriteConfigAs(configWritePath); err != nil {
-			cmd.PrintErrln("Error occured while writing config file!\n" + err.Error())
-			return
-		}
-	} else {
-		lib.InitConfigFile(viper.GetViper(), configWriteDirPath, false)
-
-		if err := viper.SafeWriteConfigAs(configWritePath); err != nil {
-			cmd.PrintErrln(err.Error())
-			return
-		}
+	cliConfig := lib.InitCliConfig()
+	if err := lib.WriteConfig(cliConfig, configWriteDirPath, true); err != nil {
+		cmd.PrintErrln("Error occured while writing config file!\n" + err.Error())
+		return
 	}
 
 	libUtils.OpenFileInEditor(configWritePath)

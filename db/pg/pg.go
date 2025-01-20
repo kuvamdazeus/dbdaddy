@@ -1,6 +1,7 @@
 package pg
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/fossmedaddy/dbdaddy/constants"
@@ -43,7 +44,9 @@ func DbExists(dbname string) bool {
 	row := globals.DB.QueryRow(pgq.QCheckDbExists(dbname))
 
 	exists := false
-	_ = row.Scan(&exists)
+	if err := row.Scan(&exists); err != nil {
+		fmt.Println(err)
+	}
 
 	return exists
 }

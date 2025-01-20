@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -31,8 +29,6 @@ var cmd = &cobra.Command{
 }
 
 func run(cmd *cobra.Command, args []string) {
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
-
 	var dumpFilePath string
 	if len(userDumpFilePath) == 0 {
 		var configFilePath string
@@ -77,11 +73,10 @@ func run(cmd *cobra.Command, args []string) {
 		dumpFilePath = path
 	}
 
-	connConfig := globals.CurrentConnConfig
-	connConfig.Database = currBranch
-
-	cmd.Printf("Attempting restore on db: '%s' using backup dump file: '%s' ...\n", currBranch, dumpFilePath)
-	if err := db_int.RestoreDb(connConfig, dumpFilePath, true); err != nil {
+	cmd.Printf("Attempting restore on db: '%s' using backup dump file: '%s'...\n", globals.CliConfig.State.CurrentBranch, dumpFilePath)
+	if err := lib.TmpSwitchDB(globals.CliConfig.State.CurrentBranch, func() error {
+		return db_int.RestoreDb(globals.CliConfig.State.CurrentBranch, dumpFilePath, true)
+	}); err != nil {
 		cmd.PrintErrln("error occured while restoring db\n", err)
 		return
 	}

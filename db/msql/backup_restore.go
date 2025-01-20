@@ -7,11 +7,10 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
-	"github.com/spf13/viper"
+	"github.com/fossmedaddy/dbdaddy/globals"
 )
 
-func DumpDb(outputFilePath string, v *viper.Viper, onlySchema bool) error {
+func DumpDb(outputFilePath string, onlySchema bool) error {
 	args := []string{
 		// fmt.Sprintf("--user=%s", v.GetString(constants.DbConfigUserKey)),
 		// fmt.Sprintf("--password=%s", v.GetString(constants.DbConfigPassKey)),
@@ -22,7 +21,7 @@ func DumpDb(outputFilePath string, v *viper.Viper, onlySchema bool) error {
 		"--no-create-db",
 		"--no-autocommit",
 		"--databases",
-		v.GetString(constants.DbConfigCurrentBranchKey),
+		globals.CliConfig.State.CurrentBranch,
 	}
 	if onlySchema {
 		args = append(args, "--no-data")
@@ -64,7 +63,7 @@ func DumpDb(outputFilePath string, v *viper.Viper, onlySchema bool) error {
 	return nil
 }
 
-func RestoreDb(dbname string, v *viper.Viper, dumpFilePath string, override bool) error {
+func RestoreDb(dbname string, dumpFilePath string, override bool) error {
 	if DbExists(dbname) {
 		if override {
 			if err := DeleteDb(dbname); err != nil {

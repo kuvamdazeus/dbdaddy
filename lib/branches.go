@@ -6,13 +6,10 @@ import (
 	"path"
 	"regexp"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/errs"
 	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
-
-	"github.com/spf13/viper"
 )
 
 func ValidateBranchName(branchname string) bool {
@@ -25,9 +22,19 @@ func ValidateBranchName(branchname string) bool {
 }
 
 func SetCurrentBranch(branchname string) error {
+	configDirPath, configErr := libUtils.FindConfigDirPath()
+	if configErr != nil {
+		return configErr
+	}
+
+	_, cwdIsProject, cwdErr := libUtils.CwdIsProject()
+	if cwdErr != nil {
+		return cwdErr
+	}
+
 	if db_int.DbExists(branchname) {
-		viper.Set(constants.DbConfigCurrentBranchKey, branchname)
-		viper.WriteConfig()
+		globals.CliConfig.State.CurrentBranch = branchname
+		WriteConfig(globals.CliConfig, configDirPath, cwdIsProject)
 	} else {
 		return fmt.Errorf("provided branchname doesn't exist")
 	}
@@ -43,19 +50,18 @@ func NewBranchFromCurrent(dbname string, onlySchema bool) error {
 	configFilePath, _ := libUtils.FindConfigFilePath()
 	dumpFilePath := path.Join(
 		libUtils.GetDriverDumpDir(configFilePath, globals.CurrentConnConfig.Driver),
-		libUtils.GetDumpFileName(viper.GetString(constants.DbConfigCurrentBranchKey)),
+		libUtils.GetDumpFileName(globals.CliConfig.State.CurrentBranch),
 	)
 
-	connConfig := globals.CurrentConnConfig
-	connConfig.Database = viper.GetString(constants.DbConfigCurrentBranchKey)
-
-	if err := db_int.DumpDb(dumpFilePath, connConfig, onlySchema); err != nil {
+	if err := TmpSwitchDB(globals.CliConfig.State.CurrentBranch, func() error {
+		return db_int.DumpDb(dumpFilePath, globals.CliConfig.State.CurrentBranch, onlySchema)
+	}); err != nil {
 		return err
 	}
 
-	restoreDbConnConfig := connConfig
-	restoreDbConnConfig.Database = dbname
-	if err := db_int.RestoreDb(restoreDbConnConfig, dumpFilePath, true); err != nil {
+	if err := TmpSwitchDB(dbname, func() error {
+		return db_int.RestoreDb(dbname, dumpFilePath, true)
+	}); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(dumpFilePath); err != nil {

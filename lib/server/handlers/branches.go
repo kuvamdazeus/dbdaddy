@@ -4,11 +4,11 @@ import (
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
+	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/types"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/spf13/viper"
 )
 
 func HandleGetBranches(c *fiber.Ctx) error {
@@ -27,7 +27,7 @@ func HandleGetBranches(c *fiber.Ctx) error {
 func HandleGetCurrentBranch(c *fiber.Ctx) error {
 	return c.JSON(types.Response{
 		Message: "success",
-		Data:    viper.GetString(constants.DbConfigCurrentBranchKey),
+		Data:    globals.CliConfig.State.CurrentBranch,
 	})
 }
 
@@ -51,10 +51,7 @@ func HandlePutCurrentBranch(c *fiber.Ctx) error {
 		})
 	}
 
-	connConfig := types.ConnConfig{}
-	if err := viper.UnmarshalKey(constants.DbConfigConnKey, &connConfig); err != nil {
-		return err
-	}
+	connConfig := globals.CliConfig.MainConnConfig
 	connConfig.Database = reqBody.BranchName
 
 	_, err := db.ConnectDb(connConfig)

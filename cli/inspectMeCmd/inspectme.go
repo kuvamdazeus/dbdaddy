@@ -2,23 +2,24 @@ package inspectMeCmd
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
-	"github.com/fossmedaddy/dbdaddy/lib"
-	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
 	"github.com/fossmedaddy/dbdaddy/sqlwriter"
 	"github.com/fossmedaddy/dbdaddy/types"
+	"golang.org/x/exp/maps"
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
-	showAll bool
+	showAll        bool
+	remoteFlag     bool
+	remoteNameFlag string
 )
 
 var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
@@ -40,29 +41,36 @@ func getColName(name string, pk bool) string {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
-
-	err := lib.TmpSwitchDB(currBranch, func() error {
+	err := cliUtils.TmpSwitchSuitableConn(cmd, func(connConfig types.ConnConfig, usingRemoteConnConfig bool) error {
 		selectedTables := []string{}
 
-		dbTables, err := db_int.ListTablesInDb()
+		dbSchema, err := db_int.GetDbSchema()
 		if err != nil {
-			return fmt.Errorf("unexpected error occured while fetching tables from database '%s'\n%s", currBranch, err.Error())
-		}
-		dbStrTables := []string{}
-		for _, dbTable := range dbTables {
-			dbStrTables = append(dbStrTables, libUtils.GetTableId(dbTable.Schema, dbTable.Name))
+			return fmt.Errorf("unexpected error occured while fetching tables from database '%s'\n%s", connConfig.Database, err.Error())
 		}
 
+		dbStrTables := maps.Keys(dbSchema.Tables)
+		slices.Sort(dbStrTables)
+
+		notFoundTableWarnings := false
 		if showAll {
 			selectedTables = dbStrTables
 		} else if len(args) > 0 {
-			for _, tableid := range dbStrTables {
-				_, tablename := libUtils.GetTableFromId(tableid)
-				for _, arg := range args {
-					if tablename == arg || tableid == arg {
-						selectedTables = append(selectedTables, tableid)
+			for _, arg := range args {
+				var searchTableId string
+				if strings.Contains(".", arg) {
+					searchTableId = arg
+				} else {
+					searchTableId = fmt.Sprintf("public.%s", arg)
+				}
+
+				if dbSchema.Tables[searchTableId] != nil {
+					selectedTables = append(selectedTables, searchTableId)
+				} else {
+					if !notFoundTableWarnings {
+						notFoundTableWarnings = true
 					}
+					cmd.Println(fmt.Sprintf("WARNING: table '%s' was not found!", searchTableId))
 				}
 			}
 		} else {
@@ -82,10 +90,8 @@ func run(cmd *cobra.Command, args []string) {
 
 			selectedTables = append(selectedTables, result)
 		}
-
-		dbSchema, err := db_int.GetDbSchema()
-		if err != nil {
-			return err
+		if notFoundTableWarnings {
+			cmd.Println()
 		}
 
 		viewsPrintBuf := ""
@@ -108,6 +114,17 @@ func run(cmd *cobra.Command, args []string) {
 				return err
 			}
 
+			indSql := ""
+			if !isView {
+				for _, index := range tableSchema.Indexes {
+					if sql, err := sqlwriter.GetCreateIndexSQL(&index); err != nil {
+						cmd.Println(fmt.Sprintf("WARNING: sql for index '%s' cannot be generated! %s", index.Name, err.Error()))
+					} else {
+						indSql += sql
+					}
+				}
+			}
+
 			tableConSql := ""
 			if !isView {
 				for _, con := range tableSchema.Constraints {
@@ -125,7 +142,7 @@ func run(cmd *cobra.Command, args []string) {
 				viewsPrintBuf += fmt.Sprintln()
 			} else {
 				cmd.Println(fmt.Sprintf("--- TABLE: %s", tableid))
-				cmd.Println(defSql + tableConSql)
+				cmd.Println(defSql + tableConSql + fmt.Sprintln() + indSql)
 				cmd.Println()
 			}
 		}
@@ -142,6 +159,7 @@ func run(cmd *cobra.Command, args []string) {
 }
 
 func Init() *cobra.Command {
+	cliUtils.AddRemoteFlags(cmd, &remoteFlag, &remoteNameFlag)
 	cmd.Flags().BoolVar(&showAll, "all", false, "print schema for all tables")
 
 	return cmd

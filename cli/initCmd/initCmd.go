@@ -11,7 +11,6 @@ import (
 	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cmdManual = fmt.Sprintf(`
@@ -135,27 +134,25 @@ func run(cmd *cobra.Command, args []string) {
 			return
 		}
 
-		v := viper.New()
-		lib.InitConfigFile(v, cwd, false)
-		v.Set(constants.DbConfigConnKey, connConfig)
-		v.Set(constants.DbConfigCurrentBranchKey, connConfig.Database)
-
-		if err := v.WriteConfigAs(projectConfigFilePath); err != nil {
+		cliConfig := lib.InitCliConfig()
+		cliConfig.MainConnConfig = connConfig
+		cliConfig.State.CurrentBranch = connConfig.Database
+		cliConfig.EnvVars[constants.EnvVarsDatabaseUrlKey] = connConfig.ConnString
+		if err := lib.InitConfigFile(cliConfig, cwd, true); err != nil {
 			cmd.PrintErrln("unexpected error occured")
 			return
 		}
 	} else {
-		v := viper.New()
-
 		if configDirPath, _ := libUtils.FindConfigDirPath(); configDirPath == path.Join(cwd, constants.SelfConfigDirName) {
 			configFilePath := path.Join(configDirPath, constants.SelfConfigFileName)
-			if err := lib.ReadConfig(v, configFilePath); err != nil {
+			_, err := lib.ReadConfig(configDirPath, true)
+			if err != nil {
 				cmd.PrintErrln("unexpected error occured")
 				cmd.PrintErrln(err)
 				return
 			}
 
-			if err := v.WriteConfigAs(projectConfigFilePath); err != nil {
+			if err := lib.WriteConfig(globals.CliConfig, projectConfigFilePath, true); err != nil {
 				cmd.PrintErrln("unexpected error occured")
 				cmd.PrintErrln(err)
 				return
@@ -196,7 +193,7 @@ func run(cmd *cobra.Command, args []string) {
 				os.Remove(configDirPath)
 			}
 		} else {
-			if err := lib.InitConfigFile(v, cwd, true); err != nil {
+			if err := lib.InitConfigFile(lib.InitCliConfig(), cwd, true); err != nil {
 				cmd.PrintErrln("error occured while writing config file")
 				cmd.PrintErrln(err)
 				return

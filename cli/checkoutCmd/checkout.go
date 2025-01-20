@@ -3,16 +3,16 @@ package checkoutCmd
 import (
 	"errors"
 	"fmt"
+	"os"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/errs"
+	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // flags
@@ -39,13 +39,22 @@ func Init() *cobra.Command {
 }
 
 func run(cmd *cobra.Command, args []string) {
+	configDirPath, configErr := libUtils.FindConfigDirPath()
+	if configErr != nil {
+		cmd.PrintErrln("unexpected error occured!", configErr)
+		os.Exit(1)
+	}
+
 	branchname := args[0]
 
-	if _, cwdIsProject, err := libUtils.CwdIsProject(); err != nil {
+	_, cwdIsProject, cwdErr := libUtils.CwdIsProject()
+	if cwdErr != nil {
 		cmd.PrintErrln("unexpected error occured!")
-		cmd.PrintErrln(err)
+		cmd.PrintErrln(cwdErr)
 		return
-	} else if cwdIsProject {
+	}
+
+	if cwdIsProject {
 		cmd.Println("in a project, can't switch branches!")
 		cmd.Println("a project is attached to ONLY ONE DATABASE")
 		return
@@ -82,17 +91,17 @@ func run(cmd *cobra.Command, args []string) {
 			return
 		}
 	} else {
-		if db_int.DbExists(branchname) {
-			viper.Set(constants.DbConfigCurrentBranchKey, branchname)
-			viper.WriteConfig()
-		} else {
+		if !db_int.DbExists(branchname) {
 			cmd.PrintErrf("Database branch '%s' does not exists, run 'checkout <branchname> -n' to create a new branch\n", branchname)
 			return
 		}
 	}
 
-	viper.Set(constants.DbConfigCurrentBranchKey, branchname)
-	viper.WriteConfig()
+	globals.CliConfig.State.CurrentBranch = branchname
+	if err := lib.WriteConfig(globals.CliConfig, configDirPath, false); err != nil {
+		cmd.PrintErrln("unexpected error occured!", err)
+		os.Exit(1)
+	}
 
 	cmd.Println(fmt.Sprintf("Switched to branch: %s", branchname))
 }

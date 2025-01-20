@@ -1,14 +1,15 @@
 package uriCmd
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
-	"github.com/fossmedaddy/dbdaddy/constants"
-	"github.com/fossmedaddy/dbdaddy/db"
+	"github.com/fossmedaddy/dbdaddy/globals"
+	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/types"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -36,13 +37,16 @@ func run(cmd *cobra.Command, args []string) {
 		connConfig = cc
 	}
 
-	if _, err := db.ConnectDb(connConfig); err != nil {
-		cmd.PrintErrln("error occured while trying to connect with your provided uri, please check your connection uri...")
+	if err := lib.TmpSwitchConn(connConfig, func() error {
+		return nil
+	}); err != nil {
+		cmd.PrintErrln(fmt.Sprintf("could not connect to '%s'", connConfig.ConnString))
+		cmd.PrintErrln("please check your provided connection uri.")
 		cmd.PrintErrln(err)
-		return
+		os.Exit(1)
 	}
 
-	configFilePath, err := libUtils.FindConfigFilePath()
+	configDirPath, err := libUtils.FindConfigDirPath()
 	if err != nil {
 		cmd.PrintErrln("error occured while trying to find config file in your device...")
 		cmd.PrintErrln(err)
@@ -50,20 +54,26 @@ func run(cmd *cobra.Command, args []string) {
 	}
 
 	if useGlobalConfigFlag {
-		configFilePath = libUtils.GetGlobalConfigPath()
+		configDirPath = libUtils.GetGlobalConfigPath()
 	}
 
 	if useShadowConfigFlag {
-		viper.Set(constants.DbConfigShadowConnKey, connConfig)
+		globals.CliConfig.ShadowConnConfig = &connConfig
 	} else {
-		viper.Set(constants.DbConfigConnKey, connConfig)
-		viper.Set(constants.DbConfigCurrentBranchKey, connConfig.Database)
+		globals.CliConfig.MainConnConfig = connConfig
+		globals.CliConfig.State.CurrentBranch = connConfig.Database
 	}
 
-	if err := viper.WriteConfigAs(configFilePath); err != nil {
+	_, isCwdProject, err := libUtils.CwdIsProject()
+	if err != nil {
+		cmd.PrintErrln("unexpected error occured!")
+		os.Exit(1)
+	}
+
+	if err := lib.WriteConfig(globals.CliConfig, configDirPath, isCwdProject); err != nil {
 		cmd.PrintErrln("unexpected error occured while writing to config file")
 		cmd.PrintErrln(err)
-		return
+		os.Exit(1)
 	}
 
 	cmd.Println("db connection credentials changed successfully in config")

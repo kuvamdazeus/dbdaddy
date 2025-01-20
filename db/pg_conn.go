@@ -19,7 +19,7 @@ func GetPgConnUriFromConnConfig(connConfig types.ConnConfig) string {
 	urlParams = strings.TrimRight(urlParams, "&")
 
 	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s%s",
+		"postgresql://%s:%s@%s:%s/%s%s",
 		connConfig.User,
 		connConfig.Password,
 		connConfig.Host,

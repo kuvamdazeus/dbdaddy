@@ -13,18 +13,21 @@ import (
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/lib"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
+	"github.com/fossmedaddy/dbdaddy/types"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
 var (
-	noTx        bool
-	outFileFlag string
-	queryFlag   string
+	noTx           bool
+	outFileFlag    string
+	queryFlag      string
+	remoteFlag     bool
+	remoteNameFlag string
 )
 
 var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
@@ -185,8 +188,7 @@ func runQuery(cmd *cobra.Command, query string) error {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
-	err := lib.TmpSwitchDB(currBranch, func() error {
+	err := cliUtils.TmpSwitchSuitableConn(cmd, func(connConfig types.ConnConfig, usingRemoteConnConfig bool) error {
 		if len(args) > 0 {
 			return runFile(cmd, args[0])
 		}
@@ -194,6 +196,10 @@ func run(cmd *cobra.Command, args []string) {
 		if queryFlag != "" {
 			return runQuery(cmd, queryFlag)
 		}
+
+		cmd.Println("starting SQL shell...")
+		cmd.Println("special commands: '.tables', '.exit'")
+		cmd.Println()
 
 		for {
 			reader := bufio.NewReader(os.Stdin)
@@ -216,7 +222,7 @@ func run(cmd *cobra.Command, args []string) {
 					return err
 				}
 
-				cmd.Println("Listing tables in database:", currBranch)
+				cmd.Println("Listing tables in database:", connConfig.Database)
 				for i, table := range tables {
 					cmd.Printf("%d. %s.%s\n", i+1, table.Schema, table.Name)
 				}
@@ -241,6 +247,8 @@ func run(cmd *cobra.Command, args []string) {
 }
 
 func Init() *cobra.Command {
+	cliUtils.AddRemoteFlags(cmd, &remoteFlag, &remoteNameFlag)
+
 	cmd.Flags().BoolVar(&noTx, "no-tx", false, "when running a SQL file, by default queries are run in a transaction block, use this to disable this behaviour")
 	cmd.Flags().StringVarP(&queryFlag, "query", "q", "", "enter text here to execute a one-off query")
 	cmd.Flags().StringVarP(&outFileFlag, "output", "o", "", "specify CSV-formatted output file path here. supplied along with '-q'")

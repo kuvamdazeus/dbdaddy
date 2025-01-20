@@ -2,66 +2,53 @@ package libUtils
 
 import (
 	"fmt"
-	"strings"
+	"slices"
 
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/errs"
+	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/types"
 	"github.com/jackc/pgx/v5"
-	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 )
 
-func GetConnConfigFromViper(v *viper.Viper) (types.ConnConfig, error) {
-	connConfig := types.ConnConfig{}
-	parseErr := v.UnmarshalKey(constants.DbConfigConnKey, &connConfig)
-	if parseErr != nil {
-		return connConfig, parseErr
-	}
-
-	currBranch := v.GetString(constants.DbConfigCurrentBranchKey)
-	connConfig.Database = currBranch
-
-	return connConfig, nil
-}
-
 func GetConnConfigFromUri(uri string) (types.ConnConfig, error) {
-	connConfig := types.ConnConfig{}
-
-	if strings.HasPrefix(uri, "postgresql://") {
-		dbConfig, uriErr := pgx.ParseConfig(uri)
-		if uriErr != nil {
-			return connConfig, uriErr
-		}
-
-		connConfig.User = dbConfig.User
-		connConfig.Password = dbConfig.Password
-		connConfig.Host = dbConfig.Host
-		connConfig.Port = fmt.Sprint(dbConfig.Port)
-		connConfig.Database = dbConfig.Database
-		connConfig.Params = dbConfig.RuntimeParams
-		connConfig.Driver = constants.DbDriverPostgres
-	} else {
-		return connConfig, errs.ErrUnsupportedDriver
+	dbConfig, uriErr := pgx.ParseConfig(uri)
+	if uriErr == nil {
+		return types.ConnConfig{
+			User:       dbConfig.User,
+			Password:   dbConfig.Password,
+			Host:       dbConfig.Host,
+			Port:       fmt.Sprint(dbConfig.Port),
+			Database:   dbConfig.Database,
+			Params:     dbConfig.RuntimeParams,
+			Driver:     constants.DbDriverPostgres,
+			ConnString: dbConfig.ConnString(),
+		}, nil
 	}
 
-	return connConfig, nil
+	// try parsing for other database drivers (ONLY SUPPORTED ONES)
+
+	return types.ConnConfig{}, errs.ErrUnsupportedDriver
 }
 
-func GetShadowConnConfig(v *viper.Viper) (types.ConnConfig, error) {
-	connConfig := types.ConnConfig{}
-
-	if v.IsSet(constants.DbConfigShadowConnKey) {
-		if err := v.UnmarshalKey(constants.DbConfigShadowConnKey, &connConfig); err != nil {
-			return connConfig, err
-		}
+func GetShadowConnConfig() types.ConnConfig {
+	if globals.CliConfig.ShadowConnConfig != nil {
+		return *globals.CliConfig.ShadowConnConfig
 	} else {
-		if cc, err := GetConnConfigFromViper(v); err != nil {
-			return cc, err
-		} else {
-			connConfig = cc
-		}
+		return globals.CliConfig.MainConnConfig
+	}
+}
+
+func GetRemoteConnConfig(cliConfig *types.CliConfig, originKey string) (types.ConnConfig, error) {
+	var connConfig types.ConnConfig
+
+	originMKeys := maps.Keys(cliConfig.Origins)
+
+	if !slices.Contains(originMKeys, originKey) {
+		return connConfig, fmt.Errorf("remote origin with name '%s' was not found!", originKey)
 	}
 
+	connConfig = cliConfig.Origins[originKey]
 	return connConfig, nil
-
 }

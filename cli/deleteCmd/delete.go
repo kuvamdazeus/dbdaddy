@@ -9,13 +9,12 @@ import (
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/globals"
+	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
-	"github.com/fossmedaddy/dbdaddy/types"
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -86,6 +85,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	// config dir directories marking
 	configFilePath, _ := libUtils.FindConfigFilePath()
+	configDirPath := path.Dir(configFilePath)
 	// dumps marking
 	driverDumpDir := path.Join(
 		libUtils.GetDriverDumpDir(configFilePath, globals.CurrentConnConfig.Driver),
@@ -101,34 +101,31 @@ func run(cmd *cobra.Command, args []string) {
 		}
 	}
 	// migrations dir marking
-	migDirName := libUtils.GetMigrationsDir(path.Dir(configFilePath), delDbName)
+	migDirName := libUtils.GetLocalMigrationsDir(path.Dir(configFilePath), delDbName)
 	os.Rename(migDirName, migDirName+constants.SoftDeleteSuffix)
 
 	// remote origin cleanup
-	origins := types.DbConfigOrigins{}
-	if err := viper.UnmarshalKey(constants.DbConfigOriginsKey, &origins); err != nil {
-		cmd.PrintErrln("error occured while reading remote origins")
-		cmd.PrintErrln(err)
-		return
-	}
-	delete(origins, delDbName)
-	viper.Set(constants.DbConfigOriginsKey, origins)
-	if err := viper.WriteConfig(); err != nil {
+	delete(globals.CliConfig.Origins, delDbName)
+	if err := lib.WriteConfig(globals.CliConfig, configDirPath, false); err != nil {
 		cmd.PrintErrln(err)
 		return
 	}
 
 	cmd.Printf("Successfully deleted db '%s'\n", delDbName)
 
-	if viper.GetString(constants.DbConfigCurrentBranchKey) == delDbName {
-		existingDbs, err := db_int.GetExistingDbs(false)
-		if err != nil {
-			panic("Something went wrong!\n" + err.Error())
+	if globals.CliConfig.State.CurrentBranch == delDbName {
+		existingDbs, dbErr := db_int.GetExistingDbs(false)
+		if dbErr != nil {
+			cmd.PrintErrln("unexpected error occured!", dbErr)
+			os.Exit(1)
 		}
 
 		newBranchName := existingDbs[0]
-		viper.Set(constants.DbConfigCurrentBranchKey, newBranchName)
-		viper.WriteConfig()
+		globals.CliConfig.State.CurrentBranch = newBranchName
+		if err := lib.WriteConfig(globals.CliConfig, configDirPath, false); err != nil {
+			cmd.PrintErrln("unexpected error occured!", err)
+			os.Exit(1)
+		}
 
 		cmd.Printf("Switched to database branch '%s'\n", newBranchName)
 	}

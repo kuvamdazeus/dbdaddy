@@ -6,7 +6,6 @@ import (
 	"github.com/fossmedaddy/dbdaddy/types"
 )
 
-// global DB related vars (please dont fuck with them)
 var (
 	// contains full version string e.g. "vX.Y.Z-ABC"
 	Version string
@@ -14,4 +13,6 @@ var (
 	DB *sql.DB
 
 	CurrentConnConfig types.ConnConfig
+
+	CliConfig types.CliConfig
 )

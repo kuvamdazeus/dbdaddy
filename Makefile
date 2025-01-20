@@ -9,6 +9,9 @@ vet:
 build:
 	go run cmd/build/build.go $(ARGS)
 
+build-dev:
+	go build -o bin/dbdaddy cmd/main/main.go
+
 release:
 	go run cmd/release/release.go
 

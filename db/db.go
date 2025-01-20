@@ -13,7 +13,6 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/spf13/viper"
 )
 
 func openConn(driverName string, dataSourceName string) (*sql.DB, error) {
@@ -23,20 +22,15 @@ func openConn(driverName string, dataSourceName string) (*sql.DB, error) {
 	}
 
 	if err := db.Ping(); err != nil {
-		fmt.Println("WARNING: ping failed,", err)
+		fmt.Println(fmt.Sprintf("WARNING: ping failed for '%s',", dataSourceName), err)
 		return nil, errs.ErrDbPingFailed
 	}
 
 	return db, nil
 }
 
-func ConnectSelfDb(v *viper.Viper) (*sql.DB, error) {
+func ConnectSelfDb(connConfig types.ConnConfig) (*sql.DB, error) {
 	var fnLocalDb *sql.DB
-
-	connConfig := types.ConnConfig{}
-	if marshalErr := v.UnmarshalKey(constants.DbConfigConnKey, &connConfig); marshalErr != nil {
-		return nil, marshalErr
-	}
 
 	selfConnConfig := connConfig
 	selfConnConfig.Database = constants.SelfDbName

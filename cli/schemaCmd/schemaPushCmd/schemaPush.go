@@ -13,13 +13,13 @@ import (
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
 	"github.com/fossmedaddy/dbdaddy/lib"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	"github.com/fossmedaddy/dbdaddy/lib/migrationsLib"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
 	"github.com/fossmedaddy/dbdaddy/sqlwriter"
 	"github.com/fossmedaddy/dbdaddy/types"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -47,8 +47,7 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
-	if err := lib.TmpSwitchDB(currBranch, func() error {
+	if err := cliUtils.TmpSwitchSuitableConn(cmd, func(_ types.ConnConfig, usingRemoteConnConfig bool) error {
 		var wg sync.WaitGroup
 
 		stmts := []string{}
@@ -155,7 +154,7 @@ func run(cmd *cobra.Command, args []string) {
 			return nil
 		}
 
-		latestMig, isMigInit, migErr := migrationsLib.GetLatestMigrationOrInit(dbSchema, "")
+		latestMig, isMigInit, migErr := migrationsLib.GetLatestMigrationOrInit(dbSchema, "", usingRemoteConnConfig)
 		if migErr != nil {
 			return migErr
 		}
@@ -184,7 +183,15 @@ func run(cmd *cobra.Command, args []string) {
 			return err
 		}
 
-		_, migGenErr := migrationsLib.GenerateMigration(userDefinedSchema, latestMig, "", upSqlScript, downSqlScript, migrationsLib.GetInfoTextFromDiff(upChanges))
+		opts := migrationsLib.GenMigOpts{
+			CurrentState:    userDefinedSchema,
+			LatestMigration: latestMig,
+			UpSql:           upSqlScript,
+			DownSql:         downSqlScript,
+			InfoStr:         migrationsLib.GetInfoTextFromDiff(upChanges),
+			UseRemoteDir:    usingRemoteConnConfig,
+		}
+		_, migGenErr := migrationsLib.GenerateMigration(opts)
 		if migGenErr != nil {
 			return migGenErr
 		}
@@ -199,7 +206,7 @@ func run(cmd *cobra.Command, args []string) {
 
 func Init() *cobra.Command {
 	// flags here
-	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "only print out changed sql. NEITHER APPLY NOR GENERATE MIGRATION FILE for diffed changes between user-defined and database schema")
+	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "prints out sql queries for diffed changes, no migrations are generated or run.")
 	cmd.Flags().BoolVar(&forceFlag, "force", false, "bypass checks that prevent you from corrupting your database history")
 
 	return cmd

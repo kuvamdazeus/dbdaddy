@@ -6,12 +6,12 @@ import (
 
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
-	"github.com/fossmedaddy/dbdaddy/lib"
+	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	migrationsLib "github.com/fossmedaddy/dbdaddy/lib/migrationsLib"
 	"github.com/fossmedaddy/dbdaddy/middlewares"
+	"github.com/fossmedaddy/dbdaddy/types"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
@@ -23,15 +23,13 @@ var cmd = &cobra.Command{
 }
 
 func run(cmd *cobra.Command, args []string) {
-	currBranch := viper.GetString(constants.DbConfigCurrentBranchKey)
-
-	err := lib.TmpSwitchDB(currBranch, func() error {
+	err := cliUtils.TmpSwitchSuitableConn(cmd, func(connConfig types.ConnConfig, usingRemoteConnConfig bool) error {
 		currentState, err := db_int.GetDbSchema()
 		if err != nil {
 			return err
 		}
 
-		migStat, err := migrationsLib.Status(currentState)
+		migStat, err := migrationsLib.Status(currentState, usingRemoteConnConfig)
 		if err != nil {
 			return err
 		}

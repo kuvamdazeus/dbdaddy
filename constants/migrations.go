@@ -7,7 +7,8 @@ const (
 
 // collection of migrations for each db
 const (
-	MigDirName = "migrations"
+	MigDirName      = "migrations"
+	MigLocalDirName = ".local"
 )
 
 // migration dir files e.g. "migrations/dbname/version_string/*"

@@ -4,22 +4,22 @@ import (
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/pg"
 	"github.com/fossmedaddy/dbdaddy/errs"
-	"github.com/fossmedaddy/dbdaddy/types"
+	"github.com/fossmedaddy/dbdaddy/globals"
 )
 
-func DumpDb(outputFilePath string, connConfig types.ConnConfig, onlySchema bool) error {
-	switch connConfig.Driver {
+func DumpDb(outputFilePath string, dbname string, onlySchema bool) error {
+	switch globals.CurrentConnConfig.Driver {
 	case constants.DbDriverPostgres:
-		return pg.DumpDb(outputFilePath, connConfig, onlySchema)
+		return pg.DumpDb(outputFilePath, globals.CurrentConnConfig, onlySchema)
 	default:
 		return errs.ErrUnsupportedDriver
 	}
 }
 
-func RestoreDb(connConfig types.ConnConfig, dumpFilePath string, override bool) error {
-	switch connConfig.Driver {
+func RestoreDb(dbname string, dumpFilePath string, override bool) error {
+	switch globals.CurrentConnConfig.Driver {
 	case constants.DbDriverPostgres:
-		return pg.RestoreDb(connConfig, dumpFilePath, override)
+		return pg.RestoreDb(dbname, dumpFilePath, override)
 	default:
 		return errs.ErrUnsupportedDriver
 	}

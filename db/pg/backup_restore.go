@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/fossmedaddy/dbdaddy/db"
+	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/types"
 )
 
@@ -73,11 +74,18 @@ func DumpDb(outputFilePath string, connConfig types.ConnConfig, onlySchema bool)
 		}
 	}
 
-	return dumpCmd.Wait()
+	if err := dumpCmd.Wait(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // creates db & restores its content from given dump
-func RestoreDb(connConfig types.ConnConfig, dumpFilePath string, override bool) error {
+func RestoreDb(dbname string, dumpFilePath string, override bool) error {
+	connConfig := globals.CurrentConnConfig
+	connConfig.Database = dbname
+
 	if DbExists(connConfig.Database) {
 		if override {
 			if err := DeleteDb(connConfig.Database); err != nil {
