@@ -64,11 +64,10 @@ func GetTableSchema(schema string, tablename string) (*types.TableSchema, error)
 func GetDbSchema(schema, tablename string) (*types.DbSchema, error) {
 	var wg sync.WaitGroup
 
-	currBranch := globals.CliConfig.State.CurrentBranch
 	tableid := libUtils.GetTableId(schema, tablename)
 
 	dbSchema := &types.DbSchema{
-		DbName: currBranch,
+		DbName: globals.CurrentConnConfig.Database,
 	}
 
 	tableSchemaMapping := map[string]*types.TableSchema{}
