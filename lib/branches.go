@@ -59,11 +59,10 @@ func NewBranchFromCurrent(dbname string, onlySchema bool) error {
 		return err
 	}
 
-	if err := TmpSwitchDB(dbname, func() error {
-		return db_int.RestoreDb(dbname, dumpFilePath, true)
-	}); err != nil {
+	if err := db_int.RestoreDb(dbname, dumpFilePath, true); err != nil {
 		return err
 	}
+
 	if err := os.RemoveAll(dumpFilePath); err != nil {
 		return err
 	}

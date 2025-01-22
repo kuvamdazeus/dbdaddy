@@ -1,6 +1,7 @@
 package db_int
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/fossmedaddy/dbdaddy/globals"
@@ -85,7 +86,7 @@ func ExecuteStatementsTx(stmts []string) error {
 
 	for _, stmt := range stmts {
 		if _, err := tx.Exec(stmt); err != nil {
-			return err
+			return fmt.Errorf("error statement:\n%s\n%s", stmt, err)
 		}
 	}
 

@@ -47,7 +47,7 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	if err := cliUtils.TmpSwitchSuitableConn(cmd, func(_ types.ConnConfig, usingRemoteConnConfig bool) error {
+	if err := cliUtils.TmpSwitchSuitableConn(cmd, func(connConfig types.ConnConfig, usingRemoteConnConfig bool) error {
 		var wg sync.WaitGroup
 
 		stmts := []string{}
@@ -102,10 +102,27 @@ func run(cmd *cobra.Command, args []string) {
 		}); err != nil {
 			return err
 		}
+		userDefinedSchema.DbName = connConfig.Database
 
 		dbSchema, err := db_int.GetDbSchema()
 		if err != nil {
 			return err
+		}
+
+		latestMig, isMigInit, migErr := migrationsLib.GetLatestMigrationOrInit(dbSchema, "", usingRemoteConnConfig)
+		if migErr != nil {
+			return migErr
+		}
+		if !latestMig.IsActive {
+			if isMigInit {
+				cmd.Println("WARNING: it is advised to generate migrations for your database in order to safely track and revert all the changes you make from schema changes")
+			} else {
+				cmd.Println("WARNING: you are not at the latest migration, this is dangerous for your database, it is advised to run this operation from latest migration")
+			}
+
+			if !forceFlag {
+				return fmt.Errorf("invalid operation not allowed")
+			}
 		}
 
 		var (
@@ -152,23 +169,6 @@ func run(cmd *cobra.Command, args []string) {
 			cmd.Println(upSqlScript)
 
 			return nil
-		}
-
-		latestMig, isMigInit, migErr := migrationsLib.GetLatestMigrationOrInit(dbSchema, "", usingRemoteConnConfig)
-		if migErr != nil {
-			return migErr
-		}
-
-		if !latestMig.IsActive {
-			if isMigInit {
-				cmd.Println("WARNING: it is advised to generate migrations for your database in order to safely track and revert all the changes you make from schema changes")
-			} else {
-				cmd.Println("WARNING: you are not at the latest migration, this is dangerous for your database, it is advised to run this operation from latest migration")
-			}
-
-			if !forceFlag {
-				return fmt.Errorf("invalid operation not allowed")
-			}
 		}
 
 		upStmts := []string{}

@@ -24,9 +24,12 @@ func PingDB() error {
 }
 
 func TmpSwitchConn(connConfig types.ConnConfig, fn func() error) error {
+	prevConnConfig := globals.CurrentConnConfig
 	defer (func() {
 		if globals.DB != nil {
-			db.ConnectDb(globals.CurrentConnConfig)
+			if _, err := db.ConnectDb(prevConnConfig); err != nil {
+				fmt.Println(fmt.Sprintf("WARNING: error occured while switching back! %s", err))
+			}
 		}
 	})()
 
@@ -50,7 +53,6 @@ func TmpSwitchDB(dbname string, fn func() error) error {
 
 func TmpSwitchToShadowDB(fn func() error) error {
 	shadowConnConfig := libUtils.GetShadowConnConfig()
-
 	if globals.CliConfig.ShadowConnConfig != nil {
 		return TmpSwitchConn(shadowConnConfig, fn)
 	}
@@ -60,7 +62,15 @@ func TmpSwitchToShadowDB(fn func() error) error {
 		return err
 	}
 
-	defer db_int.DeleteDb(shadowDbName)
-	return TmpSwitchDB(shadowDbName, fn)
+	if err := TmpSwitchDB(shadowDbName, fn); err != nil {
+		return err
+	}
 
+	defer (func() {
+		if err := db_int.DeleteDb(shadowDbName); err != nil {
+			fmt.Println(fmt.Sprintf("WARNING: shadow database could not be deleted! %s", err))
+		}
+	})()
+
+	return nil
 }

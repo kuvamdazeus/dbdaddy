@@ -20,19 +20,21 @@ func CreateShadowDB() (string, error) {
 	}
 
 	for _, db := range dbs {
-		if strings.HasPrefix(shadowDbPrefix, db) {
+		if strings.HasPrefix(db, shadowDbPrefix) {
 			dbSeq, err := strconv.Atoi(strings.ReplaceAll(db, shadowDbPrefix, ""))
 			if err != nil {
 				return "",
 					fmt.Errorf(
-						"database name '%s' has invalid non-parsable sequence, please delete this db to resolve the error.",
+						"database name '%s' has invalid non-parsable sequence, please delete/rename this db to resolve the error.",
 						db,
 					)
 			}
 
+			fmt.Println("shadowdb", db, dbSeq)
 			seq = max(dbSeq, seq)
 		}
 	}
+	fmt.Println("\nSEQ", seq)
 
 	seq++
 

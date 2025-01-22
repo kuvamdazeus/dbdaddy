@@ -7,7 +7,6 @@ import (
 
 	"github.com/fossmedaddy/dbdaddy/constants"
 	"github.com/fossmedaddy/dbdaddy/db/db_int"
-	"github.com/fossmedaddy/dbdaddy/devutils"
 	"github.com/fossmedaddy/dbdaddy/lib/cliUtils"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
 	migrationsLib "github.com/fossmedaddy/dbdaddy/lib/migrationsLib"
@@ -54,8 +53,6 @@ func run(cmd *cobra.Command, args []string) {
 		if schemaErr != nil {
 			return schemaErr
 		}
-		fmt.Println("CURRENT STATE")
-		devutils.PrettyPrint(currentState)
 
 		latestMig, _, latestMigErr := migrationsLib.GetLatestMigrationOrInit(currentState, titleFlag, usingRemoteConnConfig)
 		if latestMigErr != nil {
