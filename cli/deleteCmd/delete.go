@@ -18,7 +18,8 @@ import (
 )
 
 var (
-	silentFlag bool
+	silentFlag     bool
+	showHiddenFlag bool
 )
 
 var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
@@ -40,7 +41,7 @@ func run(cmd *cobra.Command, args []string) {
 			return
 		}
 	} else {
-		dbs, err := db_int.GetExistingDbs(false)
+		dbs, err := db_int.GetExistingDbs(showHiddenFlag)
 		if err != nil {
 			cmd.Println("unexpected error occured", err)
 			return
@@ -132,7 +133,8 @@ func run(cmd *cobra.Command, args []string) {
 }
 
 func Init() *cobra.Command {
-	cmd.Flags().BoolVar(&silentFlag, "silent", false, "silences confirmation for deleting branch")
+	cmd.Flags().BoolVar(&silentFlag, "silent", false, "silences confirmation for deleting databases")
+	cmd.Flags().BoolVar(&showHiddenFlag, "hidden", false, "also show databases that are managed by dbdaddy (by default: hidden)")
 
 	return cmd
 }

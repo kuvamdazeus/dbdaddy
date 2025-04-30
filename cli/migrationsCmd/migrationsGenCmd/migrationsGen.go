@@ -30,7 +30,7 @@ var cmdRunFn = middlewares.Apply(run, middlewares.CheckConnection)
 
 var cmd = &cobra.Command{
 	Use:   "generate",
-	Short: "generate migration files for the current database",
+	Short: "generate migration snapshot for the currently selected database.",
 	Run:   cmdRunFn,
 }
 
