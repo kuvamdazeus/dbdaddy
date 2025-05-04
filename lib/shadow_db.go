@@ -30,11 +30,9 @@ func CreateShadowDB() (string, error) {
 					)
 			}
 
-			fmt.Println("shadowdb", db, dbSeq)
 			seq = max(dbSeq, seq)
 		}
 	}
-	fmt.Println("\nSEQ", seq)
 
 	seq++
 

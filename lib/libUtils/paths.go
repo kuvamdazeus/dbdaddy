@@ -18,28 +18,33 @@ func GetAbsolutePathFor(relativePath string) (string, error) {
 	return path.Join(cwd, relativePath), err
 }
 
+func DirIsProject(dirpath string) (bool, error) {
+	if _, dirname := path.Split(dirpath); dirname == constants.SelfConfigDirName {
+		return false, nil
+	}
+
+	dirEntries, err := os.ReadDir(dirpath)
+	if err != nil {
+		return false, err
+	}
+
+	for _, dirEntry := range dirEntries {
+		if dirEntry.Name() == constants.SelfConfigFileName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func CwdIsProject() (string, bool, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return cwd, false, err
 	}
 
-	if _, dirname := path.Split(cwd); dirname == constants.SelfConfigDirName {
-		return cwd, false, nil
-	}
-
-	dirEntries, err := os.ReadDir(cwd)
-	if err != nil {
-		return cwd, false, err
-	}
-
-	for _, dirEntry := range dirEntries {
-		if dirEntry.Name() == constants.SelfConfigFileName {
-			return cwd, true, nil
-		}
-	}
-
-	return cwd, false, nil
+	isProject, projectCheckErr := DirIsProject(cwd)
+	return cwd, isProject, projectCheckErr
 }
 
 func FindConfigFilePath() (string, error) {

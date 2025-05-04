@@ -78,7 +78,7 @@ func getEnvVarOriginKey(originName string) string {
 	return fmt.Sprintf("%s%s", constants.EnvVarsOriginKeyPrefix, originName)
 }
 
-func ReadCliConfig(configDirPath string) (types.CliConfig, error) {
+func ReadCliConfig(configDirPath string, noStateFile bool) (types.CliConfig, error) {
 	configFilePath := path.Join(configDirPath, constants.SelfConfigFileName)
 	configVarsFilePath := path.Join(configDirPath, constants.SelfEnvVarsFileName)
 
@@ -109,17 +109,23 @@ func ReadCliConfig(configDirPath string) (types.CliConfig, error) {
 
 	cliConfig.EnvVars = vars
 
-	state, stateErr := ReadCliState(configDirPath)
-	if stateErr != nil {
-		return EMPTY_CLI_CONFIG, stateErr
+	if noStateFile {
+		cliConfig.State = types.CliState{
+			CurrentBranch: cliConfig.MainConnConfig.Database,
+		}
+	} else {
+		state, stateErr := ReadCliState(configDirPath)
+		if stateErr != nil {
+			return EMPTY_CLI_CONFIG, stateErr
+		}
+		cliConfig.State = state
 	}
-	cliConfig.State = state
 
 	return cliConfig, nil
 }
 
 // not to be used from outside lib
-func WriteCliConfig(cliConfig types.CliConfig, configDirPath string, useEnvVars bool) error {
+func WriteCliConfig(cliConfig types.CliConfig, configDirPath string, useEnvVars bool, noStateFile bool) error {
 	configFilePath := path.Join(configDirPath, constants.SelfConfigFileName)
 
 	dbUrl := cliConfig.MainConnConfig.ConnString
@@ -161,7 +167,6 @@ func WriteCliConfig(cliConfig types.CliConfig, configDirPath string, useEnvVars 
 	} else {
 		// populate origins without env vars
 		for name, originConnConfig := range cliConfig.Origins {
-			fmt.Println("inside originConnConfig", name, originConnConfig)
 			origins[name] = originConnConfig.ConnString
 		}
 	}
@@ -186,8 +191,10 @@ func WriteCliConfig(cliConfig types.CliConfig, configDirPath string, useEnvVars 
 		return err
 	}
 
-	if err := WriteCliState(configDirPath, cliConfig.State); err != nil {
-		return err
+	if !noStateFile {
+		if err := WriteCliState(configDirPath, cliConfig.State); err != nil {
+			return err
+		}
 	}
 
 	return nil

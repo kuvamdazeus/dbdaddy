@@ -25,7 +25,12 @@ func InitConfigFile(cliConfig types.CliConfig, configDirPath string, useEnvVars 
 		return err
 	}
 
-	if err := libUtils.WriteCliConfig(globals.CliConfig, configDirPath, useEnvVars); err != nil {
+	isProject, projectCheckErr := libUtils.DirIsProject(configDirPath)
+	if projectCheckErr != nil {
+		return projectCheckErr
+	}
+
+	if err := libUtils.WriteCliConfig(globals.CliConfig, configDirPath, useEnvVars, isProject); err != nil {
 		return err
 	}
 
@@ -69,7 +74,12 @@ func WriteConfig(cliConfig types.CliConfig, configDirPath string, useEnvVars boo
 		}
 	}
 
-	if err := libUtils.WriteCliConfig(cliConfig, configDirPath, useEnvVars); err != nil {
+	isProject, projectCheckErr := libUtils.DirIsProject(configDirPath)
+	if projectCheckErr != nil {
+		return projectCheckErr
+	}
+
+	if err := libUtils.WriteCliConfig(cliConfig, configDirPath, useEnvVars, isProject); err != nil {
 		return err
 	}
 
@@ -78,7 +88,13 @@ func WriteConfig(cliConfig types.CliConfig, configDirPath string, useEnvVars boo
 
 func ReadConfig(configDirPath string, saveInGlobalConfig bool) (types.CliConfig, error) {
 	var cliConfig types.CliConfig
-	if cc, err := libUtils.ReadCliConfig(configDirPath); err != nil {
+
+	isProject, projectCheckErr := libUtils.DirIsProject(configDirPath)
+	if projectCheckErr != nil {
+		return cliConfig, projectCheckErr
+	}
+
+	if cc, err := libUtils.ReadCliConfig(configDirPath, isProject); err != nil {
 		return cliConfig, err
 	} else {
 		cliConfig = cc

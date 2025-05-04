@@ -24,7 +24,6 @@ import (
 	"github.com/fossmedaddy/dbdaddy/cli/uriCmd"
 	"github.com/fossmedaddy/dbdaddy/cli/versionCmd"
 	"github.com/fossmedaddy/dbdaddy/db"
-	"github.com/fossmedaddy/dbdaddy/devutils"
 	"github.com/fossmedaddy/dbdaddy/globals"
 	"github.com/fossmedaddy/dbdaddy/lib"
 	"github.com/fossmedaddy/dbdaddy/lib/libUtils"
@@ -154,9 +153,9 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Println("read from configDirPath", configDirPath)
-		devutils.PrettyPrint(globals.CliConfig)
-		fmt.Println()
+		// fmt.Println("read from configDirPath", configDirPath)
+		// devutils.PrettyPrint(globals.CliConfig)
+		// fmt.Println()
 	}
 
 	rootCmd.AddCommand(versionCmd.Init())
